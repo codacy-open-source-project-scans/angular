@@ -534,6 +534,9 @@
     "name": "_injectImplementation"
   },
   {
+    "name": "_isRefreshingViews"
+  },
+  {
     "name": "_keyMap"
   },
   {
@@ -1093,6 +1096,9 @@
   },
   {
     "name": "init_cached_injector_service"
+  },
+  {
+    "name": "init_callback_scheduler"
   },
   {
     "name": "init_change_detection"
@@ -1767,9 +1773,6 @@
     "name": "init_r3_symbols"
   },
   {
-    "name": "init_raf"
-  },
-  {
     "name": "init_reactive_lview_consumer"
   },
   {
@@ -2082,6 +2085,9 @@
     "name": "isPromise"
   },
   {
+    "name": "isRefreshingViews"
+  },
+  {
     "name": "isSubscription"
   },
   {
@@ -2302,6 +2308,9 @@
   },
   {
     "name": "setInputsFromAttrs"
+  },
+  {
+    "name": "setIsRefreshingViews"
   },
   {
     "name": "setSelectedIndex"
