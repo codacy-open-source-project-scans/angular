@@ -143,7 +143,9 @@ class TemplateVisitor<Code extends ErrorCode> extends RecursiveAstVisitor implem
     this.visitAllNodes(template.references);
     this.visitAllNodes(template.children);
   }
-  visitContent(content: TmplAstContent): void {}
+  visitContent(content: TmplAstContent): void {
+    this.visitAllNodes(content.children);
+  }
   visitVariable(variable: TmplAstVariable): void {}
   visitReference(reference: TmplAstReference): void {}
   visitTextAttribute(attribute: TmplAstTextAttribute): void {}
@@ -195,7 +197,7 @@ class TemplateVisitor<Code extends ErrorCode> extends RecursiveAstVisitor implem
 
   visitForLoopBlock(block: TmplAstForLoopBlock): void {
     block.item.visit(this);
-    this.visitAllNodes(Object.values(block.contextVariables));
+    this.visitAllNodes(block.contextVariables);
     this.visitAst(block.expression);
     this.visitAllNodes(block.children);
     block.empty?.visit(this);

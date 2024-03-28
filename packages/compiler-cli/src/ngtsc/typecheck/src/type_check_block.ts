@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {AST, BindingPipe, BindingType, BoundTarget, Call, createCssSelectorFromNode, CssSelector, DYNAMIC_TYPE, ImplicitReceiver, ParsedEventType, ParseSourceSpan, PropertyRead, PropertyWrite, R3Identifiers, SafeCall, SafePropertyRead, SchemaMetadata, SelectorMatcher, ThisReceiver, TmplAstBoundAttribute, TmplAstBoundEvent, TmplAstBoundText, TmplAstDeferredBlock, TmplAstDeferredBlockTriggers, TmplAstElement, TmplAstForLoopBlock, TmplAstForLoopBlockEmpty, TmplAstHoverDeferredTrigger, TmplAstIcu, TmplAstIfBlock, TmplAstIfBlockBranch, TmplAstInteractionDeferredTrigger, TmplAstNode, TmplAstReference, TmplAstSwitchBlock, TmplAstSwitchBlockCase, TmplAstTemplate, TmplAstText, TmplAstTextAttribute, TmplAstVariable, TmplAstViewportDeferredTrigger, TransplantedType} from '@angular/compiler';
+import {AST, BindingPipe, BindingType, BoundTarget, Call, createCssSelectorFromNode, CssSelector, DYNAMIC_TYPE, ImplicitReceiver, ParsedEventType, ParseSourceSpan, PropertyRead, PropertyWrite, R3Identifiers, SafeCall, SafePropertyRead, SchemaMetadata, SelectorMatcher, ThisReceiver, TmplAstBoundAttribute, TmplAstBoundEvent, TmplAstBoundText, TmplAstContent, TmplAstDeferredBlock, TmplAstDeferredBlockTriggers, TmplAstElement, TmplAstForLoopBlock, TmplAstForLoopBlockEmpty, TmplAstHoverDeferredTrigger, TmplAstIcu, TmplAstIfBlock, TmplAstIfBlockBranch, TmplAstInteractionDeferredTrigger, TmplAstNode, TmplAstReference, TmplAstSwitchBlock, TmplAstSwitchBlockCase, TmplAstTemplate, TmplAstText, TmplAstTextAttribute, TmplAstVariable, TmplAstViewportDeferredTrigger, TransplantedType} from '@angular/compiler';
 import ts from 'typescript';
 
 import {Reference} from '../../imports';
@@ -722,7 +722,7 @@ class TcbDirectiveInputsOp extends TcbOp {
         // For signal inputs, a `transformType` will never be set as we do not capture
         // the transform in the compiler metadata. Signal inputs incorporate their
         // transform write type into their member type, and we extract it below when
-        // unwrapping the `InputSignal<ReadT, WriteT>`.
+        // setting the `WriteT` of such `InputSignalWithTransform<_, WriteT>`.
 
         if (this.dir.coercedInputFields.has(fieldName)) {
           let type: ts.TypeNode;
@@ -944,7 +944,7 @@ class TcbDomSchemaCheckerOp extends TcbOp {
  * A `TcbOp` that finds and flags control flow nodes that interfere with content projection.
  *
  * Context:
- * `@if` and `@for` try to emulate the content projection behavior of `*ngIf` and `*ngFor`
+ * Control flow blocks try to emulate the content projection behavior of `*ngIf` and `*ngFor`
  * in order to reduce breakages when moving from one syntax to the other (see #52414), however the
  * approach only works if there's only one element at the root of the control flow expression.
  * This means that a stray sibling node (e.g. text) can prevent an element from being projected
@@ -999,12 +999,10 @@ class TcbControlFlowContentProjectionOp extends TcbOp {
   }
 
   private findPotentialControlFlowNodes() {
-    const result: Array<TmplAstIfBlockBranch|TmplAstForLoopBlock|TmplAstForLoopBlockEmpty> = [];
+    const result: Array<TmplAstIfBlockBranch|TmplAstSwitchBlockCase|TmplAstForLoopBlock|
+                        TmplAstForLoopBlockEmpty> = [];
 
     for (const child of this.element.children) {
-      let eligibleNode: TmplAstForLoopBlock|TmplAstIfBlockBranch|null = null;
-
-      // Only `@for` blocks and the first branch of `@if` blocks participate in content projection.
       if (child instanceof TmplAstForLoopBlock) {
         if (this.shouldCheck(child)) {
           result.push(child);
@@ -1013,33 +1011,17 @@ class TcbControlFlowContentProjectionOp extends TcbOp {
           result.push(child.empty);
         }
       } else if (child instanceof TmplAstIfBlock) {
-        eligibleNode = child.branches[0];  // @if blocks are guaranteed to have at least one branch.
-      }
-
-      // Skip nodes with less than two children since it's impossible
-      // for them to run into the issue that we're checking for.
-      if (eligibleNode === null || eligibleNode.children.length < 2) {
-        continue;
-      }
-
-      // Count the number of root nodes while skipping empty text where relevant.
-      const rootNodeCount = eligibleNode.children.reduce((count, node) => {
-        // Normally `preserveWhitspaces` would have been accounted for during parsing, however
-        // in `ngtsc/annotations/component/src/resources.ts#parseExtractedTemplate` we enable
-        // `preserveWhitespaces` to preserve the accuracy of source maps diagnostics. This means
-        // that we have to account for it here since the presence of text nodes affects the
-        // content projection behavior.
-        if (!(node instanceof TmplAstText) || this.tcb.hostPreserveWhitespaces ||
-            node.value.trim().length > 0) {
-          count++;
+        for (const branch of child.branches) {
+          if (this.shouldCheck(branch)) {
+            result.push(branch);
+          }
         }
-
-        return count;
-      }, 0);
-
-      // Content projection can only be affected if there is more than one root node.
-      if (rootNodeCount > 1) {
-        result.push(eligibleNode);
+      } else if (child instanceof TmplAstSwitchBlock) {
+        for (const current of child.cases) {
+          if (this.shouldCheck(current)) {
+            result.push(current);
+          }
+        }
       }
     }
 
@@ -1053,23 +1035,26 @@ class TcbControlFlowContentProjectionOp extends TcbOp {
       return false;
     }
 
-    // Count the number of root nodes while skipping empty text where relevant.
-    const rootNodeCount = node.children.reduce((count, node) => {
+    let hasSeenRootNode = false;
+
+    // Check the number of root nodes while skipping empty text where relevant.
+    for (const child of node.children) {
       // Normally `preserveWhitspaces` would have been accounted for during parsing, however
       // in `ngtsc/annotations/component/src/resources.ts#parseExtractedTemplate` we enable
       // `preserveWhitespaces` to preserve the accuracy of source maps diagnostics. This means
       // that we have to account for it here since the presence of text nodes affects the
       // content projection behavior.
-      if (!(node instanceof TmplAstText) || this.tcb.hostPreserveWhitespaces ||
-          node.value.trim().length > 0) {
-        count++;
+      if (!(child instanceof TmplAstText) || this.tcb.hostPreserveWhitespaces ||
+          child.value.trim().length > 0) {
+        // Content projection will be affected if there's more than one root node.
+        if (hasSeenRootNode) {
+          return true;
+        }
+        hasSeenRootNode = true;
       }
+    }
 
-      return count;
-    }, 0);
-
-    // Content projection can only be affected if there is more than one root node.
-    return rootNodeCount > 1;
+    return false;
   }
 }
 
@@ -1460,7 +1445,7 @@ class TcbIfOp extends TcbOp {
         expression = expressionScope.resolve(branch.expressionAlias);
       }
 
-      // The expressions of the preceeding branches have to be negated
+      // The expressions of the preceding branches have to be negated
       // (e.g. `expr` becomes `!(expr)`) when comparing in the guard, except
       // for the branch's own expression which is preserved as is.
       const comparisonExpression = i === index ?
@@ -1501,7 +1486,7 @@ class TcbSwitchOp extends TcbOp {
     const comparisonExpression = tcbExpression(this.block.expression, this.tcb, this.scope);
     markIgnoreDiagnostics(comparisonExpression);
 
-    // Wrap the comparisson expression in parentheses so we don't ignore
+    // Wrap the comparison expression in parentheses so we don't ignore
     // diagnostics when comparing incompatible types (see #52315).
     const expression = ts.factory.createParenthesizedExpression(comparisonExpression);
     const root = this.generateCase(0, expression, null);
@@ -1816,12 +1801,13 @@ class Scope {
       addParseSpanInfo(loopInitializer, scopedNode.item.sourceSpan);
       scope.varMap.set(scopedNode.item, loopInitializer);
 
-      for (const [name, variable] of Object.entries(scopedNode.contextVariables)) {
-        if (!this.forLoopContextVariableTypes.has(name)) {
-          throw new Error(`Unrecognized for loop context variable ${name}`);
+      for (const variable of scopedNode.contextVariables) {
+        if (!this.forLoopContextVariableTypes.has(variable.value)) {
+          throw new Error(`Unrecognized for loop context variable ${variable.name}`);
         }
 
-        const type = ts.factory.createKeywordTypeNode(this.forLoopContextVariableTypes.get(name)!);
+        const type =
+            ts.factory.createKeywordTypeNode(this.forLoopContextVariableTypes.get(variable.value)!);
         this.registerVariable(
             scope, variable, new TcbBlockImplicitVariableOp(tcb, scope, type, variable));
       }
@@ -2048,6 +2034,8 @@ class Scope {
       this.opQueue.push(new TcbExpressionOp(this.tcb, this, node.value));
     } else if (node instanceof TmplAstIcu) {
       this.appendIcuExpressions(node);
+    } else if (node instanceof TmplAstContent) {
+      this.appendChildren(node);
     }
   }
 
@@ -2338,13 +2326,13 @@ class TcbExpressionTranslator {
    * context). This method assists in resolving those.
    */
   protected resolve(ast: AST): ts.Expression|null {
-    // TODO: this is actually a bug, because `ImpliticReceiver` extends `ThisReceiver`. Consider a
+    // TODO: this is actually a bug, because `ImplicitReceiver` extends `ThisReceiver`. Consider a
     // case when the explicit `this` read is inside a template with a context that also provides the
     // variable name being read:
     // ```
     // <ng-template let-a>{{this.a}}</ng-template>
     // ```
-    // Clearly, `this.a` should refer to the class property `a`. However, becuase of this code,
+    // Clearly, `this.a` should refer to the class property `a`. However, because of this code,
     // `this.a` will refer to `let-a` on the template context.
     //
     // Note that the generated code is actually consistent with this bug. To fix it, we have to:
@@ -2761,18 +2749,26 @@ class TcbEventHandlerTranslator extends TcbExpressionTranslator {
 }
 
 class TcbForLoopTrackTranslator extends TcbExpressionTranslator {
+  private allowedVariables: Set<TmplAstVariable>;
+
   constructor(tcb: Context, scope: Scope, private block: TmplAstForLoopBlock) {
     super(tcb, scope);
+
+    // Tracking expressions are only allowed to read the `$index`,
+    // the item and properties off the component instance.
+    this.allowedVariables = new Set([block.item]);
+    for (const variable of block.contextVariables) {
+      if (variable.value === '$index') {
+        this.allowedVariables.add(variable);
+      }
+    }
   }
 
   protected override resolve(ast: AST): ts.Expression|null {
     if (ast instanceof PropertyRead && ast.receiver instanceof ImplicitReceiver) {
       const target = this.tcb.boundTarget.getExpressionTarget(ast);
 
-      // Tracking expressions are only allowed to read the `$index`,
-      // the item and properties off the component instance.
-      if (target !== null && target !== this.block.item &&
-          target !== this.block.contextVariables.$index) {
+      if (target !== null && !this.allowedVariables.has(target)) {
         this.tcb.oobRecorder.illegalForLoopTrackAccess(this.tcb.id, this.block, ast);
       }
     }

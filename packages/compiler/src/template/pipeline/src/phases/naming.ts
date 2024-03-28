@@ -99,6 +99,20 @@ function addNamesToView(
             unit.job.views.get(op.xref)!,
             `${baseName}_${op.functionNameSuffix}_${op.handle.slot + 1}`, state, compatibility);
         break;
+      case ir.OpKind.Projection:
+        if (!(unit instanceof ViewCompilationUnit)) {
+          throw new Error(`AssertionError: must be compiling a component`);
+        }
+        if (op.handle.slot === null) {
+          throw new Error(`Expected slot to be assigned`);
+        }
+        if (op.fallbackView !== null) {
+          const fallbackView = unit.job.views.get(op.fallbackView)!;
+          addNamesToView(
+              fallbackView, `${baseName}_ProjectionFallback_${op.handle.slot}`, state,
+              compatibility);
+        }
+        break;
       case ir.OpKind.Template:
         if (!(unit instanceof ViewCompilationUnit)) {
           throw new Error(`AssertionError: must be compiling a component`);
@@ -148,7 +162,7 @@ function getVariableName(
         break;
       case ir.SemanticVariableKind.Identifier:
         if (unit.job.compatibility === ir.CompatibilityMode.TemplateDefinitionBuilder) {
-          // TODO: Prefix increment and `_r` are for compatiblity with the old naming scheme.
+          // TODO: Prefix increment and `_r` are for compatibility with the old naming scheme.
           // This has the potential to cause collisions when `ctx` is the identifier, so we need a
           // special check for that as well.
           const compatPrefix = variable.identifier === 'ctx' ? 'i' : '';

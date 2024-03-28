@@ -300,16 +300,10 @@ export class SwitchBlockCase extends BlockNode implements Node {
   }
 }
 
-// Note: this is a weird way to define the properties, but we do it so that we can
-// get strong typing when the context is passed through `Object.values`.
-/** Context variables that can be used inside a `ForLoopBlock`. */
-export type ForLoopBlockContext =
-    Record<'$index'|'$first'|'$last'|'$even'|'$odd'|'$count', Variable>;
-
 export class ForLoopBlock extends BlockNode implements Node {
   constructor(
       public item: Variable, public expression: ASTWithSource, public trackBy: ASTWithSource,
-      public trackKeywordSpan: ParseSourceSpan, public contextVariables: ForLoopBlockContext,
+      public trackKeywordSpan: ParseSourceSpan, public contextVariables: Variable[],
       public children: Node[], public empty: ForLoopBlockEmpty|null, sourceSpan: ParseSourceSpan,
       public mainBlockSpan: ParseSourceSpan, startSourceSpan: ParseSourceSpan,
       endSourceSpan: ParseSourceSpan|null, nameSpan: ParseSourceSpan, public i18n?: I18nMeta) {
@@ -396,7 +390,7 @@ export class Content implements Node {
   readonly name = 'ng-content';
 
   constructor(
-      public selector: string, public attributes: TextAttribute[],
+      public selector: string, public attributes: TextAttribute[], public children: Node[],
       public sourceSpan: ParseSourceSpan, public i18n?: I18nMeta) {}
   visit<Result>(visitor: Visitor<Result>): Result {
     return visitor.visitContent(this);
@@ -496,7 +490,7 @@ export class RecursiveVisitor implements Visitor<void> {
     visitAll(this, block.children);
   }
   visitForLoopBlock(block: ForLoopBlock): void {
-    const blockItems = [block.item, ...Object.values(block.contextVariables), ...block.children];
+    const blockItems = [block.item, ...block.contextVariables, ...block.children];
     block.empty && blockItems.push(block.empty);
     visitAll(this, blockItems);
   }
@@ -511,7 +505,9 @@ export class RecursiveVisitor implements Visitor<void> {
     block.expressionAlias && blockItems.push(block.expressionAlias);
     visitAll(this, blockItems);
   }
-  visitContent(content: Content): void {}
+  visitContent(content: Content): void {
+    visitAll(this, content.children);
+  }
   visitVariable(variable: Variable): void {}
   visitReference(reference: Reference): void {}
   visitTextAttribute(attribute: TextAttribute): void {}
