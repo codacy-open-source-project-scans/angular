@@ -414,6 +414,9 @@
     "name": "Sanitizer"
   },
   {
+    "name": "SchedulingMode"
+  },
+  {
     "name": "ShadowDomRenderer"
   },
   {
@@ -544,9 +547,6 @@
   },
   {
     "name": "_currentInjector"
-  },
-  {
-    "name": "_ensureDirtyViewsAreAlwaysReachable"
   },
   {
     "name": "_getInsertInFrontOfRNodeWithI18n"
@@ -871,9 +871,6 @@
   },
   {
     "name": "getBindingsEnabled"
-  },
-  {
-    "name": "getCallbackScheduler"
   },
   {
     "name": "getClosureSafeProperty"
@@ -1353,6 +1350,9 @@
     "name": "saveResolvedLocalsInData"
   },
   {
+    "name": "scheduleCallback"
+  },
+  {
     "name": "searchTokensOnInjector"
   },
   {
@@ -1417,9 +1417,6 @@
   },
   {
     "name": "shouldAddViewToDom"
-  },
-  {
-    "name": "shouldRecheckView"
   },
   {
     "name": "shouldSearchParent"

@@ -12,7 +12,7 @@ import {inject} from '../../di/injector_compatibility';
 import {EnvironmentProviders} from '../../di/interface/provider';
 import {makeEnvironmentProviders} from '../../di/provider_collection';
 import {PendingTasks} from '../../pending_tasks';
-import {getCallbackScheduler} from '../../util/callback_scheduler';
+import {scheduleCallback} from '../../util/callback_scheduler';
 import {NgZone, NoopNgZone} from '../../zone/ng_zone';
 
 import {ChangeDetectionScheduler, NotificationType, ZONELESS_ENABLED, ZONELESS_SCHEDULER_DISABLED} from './zoneless_scheduling';
@@ -23,7 +23,6 @@ export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
   private taskService = inject(PendingTasks);
   private pendingRenderTaskId: number|null = null;
   private shouldRefreshViews = false;
-  private readonly schedule = getCallbackScheduler();
   private readonly ngZone = inject(NgZone);
   private runningTick = false;
   private cancelScheduledCallback: null|(() => void) = null;
@@ -52,14 +51,16 @@ export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
     }
 
     this.pendingRenderTaskId = this.taskService.add();
-    if (Zone?.root?.run) {
+    // TODO(atscott): This zone.root.run can maybe just be removed when we more
+    // effectively get the unpatched versions of setTimeout and rAF (#55092)
+    if (typeof Zone !== 'undefined' && Zone.root?.run) {
       Zone.root.run(() => {
-        this.cancelScheduledCallback = this.schedule(() => {
+        this.cancelScheduledCallback = scheduleCallback(() => {
           this.tick(this.shouldRefreshViews);
         });
       });
     } else {
-      this.cancelScheduledCallback = this.schedule(() => {
+      this.cancelScheduledCallback = scheduleCallback(() => {
         this.tick(this.shouldRefreshViews);
       });
     }

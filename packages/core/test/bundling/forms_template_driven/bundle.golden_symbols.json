@@ -141,6 +141,9 @@
     "name": "ControlContainer"
   },
   {
+    "name": "ControlEvent"
+  },
+  {
     "name": "DEFAULT_APP_ID"
   },
   {
@@ -459,6 +462,9 @@
     "name": "PlatformRef"
   },
   {
+    "name": "PristineChangeEvent"
+  },
+  {
     "name": "R3Injector"
   },
   {
@@ -510,6 +516,9 @@
     "name": "Sanitizer"
   },
   {
+    "name": "SchedulingMode"
+  },
+  {
     "name": "ShadowDomRenderer"
   },
   {
@@ -520,6 +529,9 @@
   },
   {
     "name": "SkipSelf"
+  },
+  {
+    "name": "StatusChangeEvent"
   },
   {
     "name": "Subject"
@@ -564,6 +576,9 @@
     "name": "TestabilityRegistry"
   },
   {
+    "name": "TouchedChangeEvent"
+  },
+  {
     "name": "USE_VALUE"
   },
   {
@@ -571,6 +586,9 @@
   },
   {
     "name": "VE_ViewContainerRef"
+  },
+  {
+    "name": "ValueChangeEvent"
   },
   {
     "name": "ViewContainerRef"
@@ -622,9 +640,6 @@
   },
   {
     "name": "_currentInjector"
-  },
-  {
-    "name": "_ensureDirtyViewsAreAlwaysReachable"
   },
   {
     "name": "_getInsertInFrontOfRNodeWithI18n"
@@ -991,9 +1006,6 @@
   },
   {
     "name": "getBindingsEnabled"
-  },
-  {
-    "name": "getCallbackScheduler"
   },
   {
     "name": "getClosureSafeProperty"
@@ -1617,6 +1629,9 @@
     "name": "saveResolvedLocalsInData"
   },
   {
+    "name": "scheduleCallback"
+  },
+  {
     "name": "searchTokensOnInjector"
   },
   {
@@ -1690,9 +1705,6 @@
   },
   {
     "name": "shouldAddViewToDom"
-  },
-  {
-    "name": "shouldRecheckView"
   },
   {
     "name": "shouldSearchParent"

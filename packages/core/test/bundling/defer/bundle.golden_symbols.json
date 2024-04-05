@@ -441,6 +441,9 @@
     "name": "Sanitizer"
   },
   {
+    "name": "SchedulingMode"
+  },
+  {
     "name": "ShadowDomRenderer"
   },
   {
@@ -526,9 +529,6 @@
   },
   {
     "name": "_currentInjector"
-  },
-  {
-    "name": "_ensureDirtyViewsAreAlwaysReachable"
   },
   {
     "name": "_findMatchingDehydratedViewImpl"
@@ -835,9 +835,6 @@
   },
   {
     "name": "getBindingsEnabled"
-  },
-  {
-    "name": "getCallbackScheduler"
   },
   {
     "name": "getClosureSafeProperty"
@@ -1380,9 +1377,6 @@
     "name": "init_fields"
   },
   {
-    "name": "init_flags"
-  },
-  {
     "name": "init_forward_ref"
   },
   {
@@ -1420,6 +1414,9 @@
   },
   {
     "name": "init_i18n2"
+  },
+  {
+    "name": "init_i18n3"
   },
   {
     "name": "init_i18n_apply"
@@ -2289,6 +2286,9 @@
     "name": "saveResolvedLocalsInData"
   },
   {
+    "name": "scheduleCallback"
+  },
+  {
     "name": "searchTokensOnInjector"
   },
   {
@@ -2341,9 +2341,6 @@
   },
   {
     "name": "shimStylesContent"
-  },
-  {
-    "name": "shouldRecheckView"
   },
   {
     "name": "shouldSearchParent"

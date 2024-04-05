@@ -507,6 +507,9 @@
     "name": "Sanitizer"
   },
   {
+    "name": "SchedulingMode"
+  },
+  {
     "name": "ShadowDomRenderer"
   },
   {
@@ -960,9 +963,6 @@
     "name": "getBindingsEnabled"
   },
   {
-    "name": "getCallbackScheduler"
-  },
-  {
     "name": "getClosureSafeProperty"
   },
   {
@@ -1413,6 +1413,9 @@
     "name": "saveNameToExportMap"
   },
   {
+    "name": "scheduleCallback"
+  },
+  {
     "name": "searchTokensOnInjector"
   },
   {
@@ -1465,9 +1468,6 @@
   },
   {
     "name": "shimStylesContent"
-  },
-  {
-    "name": "shouldRecheckView"
   },
   {
     "name": "shouldSearchParent"
