@@ -441,9 +441,6 @@
     "name": "Sanitizer"
   },
   {
-    "name": "SchedulingMode"
-  },
-  {
     "name": "ShadowDomRenderer"
   },
   {
@@ -583,9 +580,6 @@
   },
   {
     "name": "addDepsToRegistry"
-  },
-  {
-    "name": "addLViewToLContainer"
   },
   {
     "name": "addPropertyBinding"
@@ -2103,6 +2097,9 @@
     "name": "isRefreshingViews"
   },
   {
+    "name": "isRootView"
+  },
+  {
     "name": "isSubscription"
   },
   {
@@ -2365,6 +2362,9 @@
   },
   {
     "name": "toRefArray"
+  },
+  {
+    "name": "trackMovedView"
   },
   {
     "name": "uniqueIdCounter"
