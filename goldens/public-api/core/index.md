@@ -722,6 +722,9 @@ export interface Host {
 export const Host: HostDecorator;
 
 // @public
+export const HOST_TAG_NAME: InjectionToken<string>;
+
+// @public
 export class HostAttributeToken {
     constructor(attributeName: string);
     // (undocumented)
@@ -756,7 +759,7 @@ export interface HostListener {
     eventName?: string;
 }
 
-// @public
+// @public (undocumented)
 export const HostListener: HostListenerDecorator;
 
 // @public
@@ -1351,10 +1354,10 @@ export class PlatformRef {
 }
 
 // @public
-export interface Predicate<T> {
-    // (undocumented)
-    (value: T): boolean;
-}
+export type Predicate<T> = (value: T) => boolean;
+
+// @public
+export function provideExperimentalZonelessChangeDetection(): EnvironmentProviders;
 
 // @public
 export type Provider = TypeProvider | ValueProvider | ClassProvider | ConstructorProvider | ExistingProvider | FactoryProvider | any[];
