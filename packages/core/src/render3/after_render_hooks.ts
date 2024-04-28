@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ChangeDetectionScheduler, NotificationType} from '../change_detection/scheduling/zoneless_scheduling';
+import {ChangeDetectionScheduler, NotificationSource} from '../change_detection/scheduling/zoneless_scheduling';
 import {assertInInjectionContext, Injector, runInInjectionContext, ɵɵdefineInjectable} from '../di';
 import {inject} from '../di/injector_compatibility';
 import {ErrorHandler} from '../error_handler';
@@ -331,17 +331,16 @@ export function afterNextRender(
  * A wrapper around a function to be used as an after render callback.
  */
 class AfterRenderCallback {
-  private zone = inject(NgZone);
   private errorHandler = inject(ErrorHandler, {optional: true});
 
   constructor(readonly phase: AfterRenderPhase, private callbackFn: VoidFunction) {
     // Registering a callback will notify the scheduler.
-    inject(ChangeDetectionScheduler, {optional: true})?.notify(NotificationType.AfterRenderHooks);
+    inject(ChangeDetectionScheduler, {optional: true})?.notify(NotificationSource.NewRenderHook);
   }
 
   invoke() {
     try {
-      this.zone.runOutsideAngular(this.callbackFn);
+      this.callbackFn();
     } catch (err) {
       this.errorHandler?.handleError(err);
     }

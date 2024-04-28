@@ -6,6 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {Subscription} from 'rxjs';
+
 import {ApplicationRef} from '../../application/application_ref';
 import {Injectable} from '../../di/injectable';
 import {inject} from '../../di/injector_compatibility';
@@ -17,7 +19,7 @@ import {scheduleCallbackWithMicrotask, scheduleCallbackWithRafRace} from '../../
 import {performanceMarkFeature} from '../../util/performance';
 import {NgZone, NoopNgZone} from '../../zone/ng_zone';
 
-import {ChangeDetectionScheduler, NotificationType, ZONELESS_ENABLED, ZONELESS_SCHEDULER_DISABLED} from './zoneless_scheduling';
+import {ChangeDetectionScheduler, NotificationSource, ZONELESS_ENABLED, ZONELESS_SCHEDULER_DISABLED} from './zoneless_scheduling';
 
 const CONSECUTIVE_MICROTASK_NOTIFICATION_LIMIT = 100;
 let consecutiveMicrotaskNotifications = 0;
@@ -43,29 +45,40 @@ function trackMicrotaskNotificationForDebugging() {
 
 @Injectable({providedIn: 'root'})
 export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
-  private appRef = inject(ApplicationRef);
-  private taskService = inject(PendingTasks);
-  private pendingRenderTaskId: number|null = null;
-  private shouldRefreshViews = false;
+  private readonly appRef = inject(ApplicationRef);
+  private readonly taskService = inject(PendingTasks);
   private readonly ngZone = inject(NgZone);
-  runningTick = false;
-  private cancelScheduledCallback: null|(() => void) = null;
   private readonly zonelessEnabled = inject(ZONELESS_ENABLED);
   private readonly disableScheduling =
       inject(ZONELESS_SCHEDULER_DISABLED, {optional: true}) ?? false;
   private readonly zoneIsDefined = typeof Zone !== 'undefined' && !!Zone.root.run;
   private readonly schedulerTickApplyArgs = [{data: {'__scheduler_tick__': true}}];
-  private readonly afterTickSubscription = this.appRef.afterTick.subscribe(() => {
-    // If the scheduler isn't running a tick but the application ticked, that means
-    // someone called ApplicationRef.tick manually. In this case, we should cancel
-    // any change detections that had been scheduled so we don't run an extra one.
-    if (!this.runningTick) {
-      this.cleanup();
-    }
-  });
+  private readonly subscriptions = new Subscription();
+
+  private cancelScheduledCallback: null|(() => void) = null;
+  private shouldRefreshViews = false;
+  private pendingRenderTaskId: number|null = null;
   private useMicrotaskScheduler = false;
+  runningTick = false;
 
   constructor() {
+    this.subscriptions.add(this.appRef.afterTick.subscribe(() => {
+      // If the scheduler isn't running a tick but the application ticked, that means
+      // someone called ApplicationRef.tick manually. In this case, we should cancel
+      // any change detections that had been scheduled so we don't run an extra one.
+      if (!this.runningTick) {
+        this.cleanup();
+      }
+    }));
+    this.subscriptions.add(this.ngZone.onUnstable.subscribe(() => {
+      // If the zone becomes unstable when we're not running tick (this happens from the zone.run),
+      // we should cancel any scheduled change detection here because at this point we
+      // know that the zone will stabilize at some point and run change detection itself.
+      if (!this.runningTick) {
+        this.cleanup();
+      }
+    }));
+
     // TODO(atscott): These conditions will need to change when zoneless is the default
     // Instead, they should flip to checking if ZoneJS scheduling is provided
     this.disableScheduling ||= !this.zonelessEnabled &&
@@ -75,10 +88,39 @@ export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
          !this.zoneIsDefined);
   }
 
-  notify(type = NotificationType.RefreshViews): void {
-    // When the only source of notification is an afterRender hook will skip straight to the hooks
-    // rather than refreshing views in ApplicationRef.tick
-    this.shouldRefreshViews ||= type === NotificationType.RefreshViews;
+  notify(source: NotificationSource): void {
+    if (!this.zonelessEnabled && source === NotificationSource.Listener) {
+      // When the notification comes from a listener, we skip the notification unless the
+      // application has enabled zoneless. Ideally, listeners wouldn't notify the scheduler at all
+      // automatically. We do not know that a developer made a change in the listener callback that
+      // requires an `ApplicationRef.tick` (synchronize templates / run render hooks). We do this
+      // only for an easier migration from OnPush components to zoneless. Because listeners are
+      // usually executed inside the Angular zone and listeners automatically call `markViewDirty`,
+      // developers never needed to manually use `ChangeDetectorRef.markForCheck` or some other API
+      // to make listener callbacks work correctly with `OnPush` components.
+      return;
+    }
+    switch (source) {
+      case NotificationSource.DebugApplyChanges:
+      case NotificationSource.DeferBlockStateUpdate:
+      case NotificationSource.MarkAncestorsForTraversal:
+      case NotificationSource.MarkForCheck:
+      case NotificationSource.Listener:
+      case NotificationSource.AnimationQueuedNodeRemoval:
+      case NotificationSource.SetInput: {
+        this.shouldRefreshViews = true;
+        break;
+      }
+      case NotificationSource.ViewDetachedFromDOM:
+      case NotificationSource.ViewAttached:
+      case NotificationSource.NewRenderHook:
+      case NotificationSource.AsyncAnimationsLoaded:
+      default: {
+        // These notifications only schedule a tick but do not change whether we should refresh
+        // views. Instead, we only need to run render hooks unless another notification from the
+        // other set is also received before `tick` happens.
+      }
+    }
 
     if (!this.shouldScheduleTick()) {
       return;
@@ -168,7 +210,7 @@ export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
   }
 
   ngOnDestroy() {
-    this.afterTickSubscription.unsubscribe();
+    this.subscriptions.unsubscribe();
     this.cleanup();
   }
 
@@ -225,8 +267,8 @@ export class ChangeDetectionSchedulerImpl implements ChangeDetectionScheduler {
  * ```
  *
  * This API is experimental. Neither the shape, nor the underlying behavior is stable and can change
- * in patch versions. There are known feature gaps, including the lack of a public zoneless API
- * which prevents the application from serializing too early with SSR.
+ * in patch versions. There are known feature gaps and API ergonomic considerations. We will iterate
+ * on the exact API based on the feedback and our understanding of the problem and solution space.
  *
  * @publicApi
  * @experimental

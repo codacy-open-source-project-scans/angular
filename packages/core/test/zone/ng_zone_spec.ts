@@ -9,6 +9,7 @@
 import {EventEmitter, NgZone} from '@angular/core';
 import {fakeAsync, flushMicrotasks, inject, waitForAsync} from '@angular/core/testing';
 import {Log} from '@angular/core/testing/src/testing_internal';
+import {firstValueFrom} from 'rxjs';
 
 import {scheduleCallbackWithRafRace as scheduler} from '../../src/util/callback_scheduler';
 import {global} from '../../src/util/global';
@@ -1192,6 +1193,15 @@ function commonTests() {
              done();
            });
          });
+
+      it('does not throw when apply args array has `undefined`', async () => {
+        expect(() => {
+          coalesceZone.run(function(this: any, arg: any) {}, undefined, [undefined]);
+        }).not.toThrow();
+        // wait for the zone to stabilize after the task above. Needed to prevent this from leaking
+        // into a follow-up test
+        await firstValueFrom(coalesceZone.onMicrotaskEmpty);
+      });
     });
   });
 }

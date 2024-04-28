@@ -9,6 +9,7 @@
 import {setActiveConsumer} from '@angular/core/primitives/signals';
 
 import {CachedInjectorService} from '../cached_injector_service';
+import {NotificationSource} from '../change_detection/scheduling/zoneless_scheduling';
 import {EnvironmentInjector, InjectionToken, Injector} from '../di';
 import {internalImportProvidersFrom} from '../di/provider_collection';
 import {RuntimeError, RuntimeErrorCode} from '../errors';
@@ -480,8 +481,10 @@ export function renderDeferBlockState(
 
   if (isValidStateChange(currentState, newState) &&
       isValidStateChange(lDetails[NEXT_DEFER_BLOCK_STATE] ?? -1, newState)) {
+    const injector = hostLView[INJECTOR]!;
     const tDetails = getTDeferBlockDetails(hostTView, tNode);
-    const needsScheduling = !skipTimerScheduling &&
+    // Skips scheduling on the server since it can delay the server response.
+    const needsScheduling = !skipTimerScheduling && isPlatformBrowser(injector) &&
         (getLoadingBlockAfter(tDetails) !== null ||
          getMinimumDurationForState(tDetails, DeferBlockState.Loading) !== null ||
          getMinimumDurationForState(tDetails, DeferBlockState.Placeholder));
@@ -507,8 +510,24 @@ export function renderDeferBlockState(
  */
 export function isRouterOutletInjector(currentInjector: Injector): boolean {
   return (currentInjector instanceof ChainedInjector) &&
-      ((currentInjector.injector as any).__ngOutletInjector);
+      (typeof (currentInjector.injector as any).__ngOutletInjector === 'function');
 }
+
+/**
+ * Creates an instance of the `OutletInjector` using a private factory
+ * function available on the `OutletInjector` class.
+ *
+ * @param parentOutletInjector Parent OutletInjector, which should be used
+ *                             to produce a new instance.
+ * @param parentInjector An Injector, which should be used as a parent one
+ *                       for a newly created `OutletInjector` instance.
+ */
+function createRouterOutletInjector(
+    parentOutletInjector: ChainedInjector, parentInjector: Injector) {
+  const outletInjector = parentOutletInjector.injector as any;
+  return outletInjector.__ngOutletInjector(parentInjector);
+}
+
 
 /**
  * Applies changes to the DOM to reflect a given state.
@@ -542,18 +561,29 @@ function applyDeferBlockState(
       const providers = tDetails.providers;
       if (providers && providers.length > 0) {
         const parentInjector = hostLView[INJECTOR] as Injector;
+
         // Note: we have a special case for Router's `OutletInjector`,
         // since it's not an instance of the `EnvironmentInjector`, so
         // we can't inject it. Once the `OutletInjector` is replaced
         // with the `EnvironmentInjector` in Router's code, this special
         // handling can be removed.
-        const parentEnvInjector = isRouterOutletInjector(parentInjector) ?
-            parentInjector :
-            parentInjector.get(EnvironmentInjector);
+        const isParentOutletInjector = isRouterOutletInjector(parentInjector);
+        const parentEnvInjector =
+            isParentOutletInjector ? parentInjector : parentInjector.get(EnvironmentInjector);
+
         injector = parentEnvInjector.get(CachedInjectorService)
                        .getOrCreateInjector(
                            tDetails, parentEnvInjector as EnvironmentInjector, providers,
                            ngDevMode ? 'DeferBlock Injector' : '');
+
+        // Note: this is a continuation of the special case for Router's `OutletInjector`.
+        // Since the `OutletInjector` handles `ActivatedRoute` and `ChildrenOutletContexts`
+        // dynamically (i.e. their values are not really stored statically in an injector),
+        // we need to "wrap" a defer injector into another `OutletInjector`, so we retain
+        // the dynamic resolution of the mentioned tokens.
+        if (isParentOutletInjector) {
+          injector = createRouterOutletInjector(parentInjector as ChainedInjector, injector);
+        }
       }
     }
     const dehydratedView = findMatchingDehydratedView(lContainer, activeBlockTNode.tView!.ssrId);
@@ -561,7 +591,7 @@ function applyDeferBlockState(
         createAndRenderEmbeddedLView(hostLView, activeBlockTNode, null, {dehydratedView, injector});
     addLViewToLContainer(
         lContainer, embeddedLView, viewIndex, shouldAddViewToDom(activeBlockTNode, dehydratedView));
-    markViewDirty(embeddedLView);
+    markViewDirty(embeddedLView, NotificationSource.DeferBlockStateUpdate);
   }
 }
 
@@ -665,7 +695,8 @@ export function triggerPrefetching(tDetails: TDeferBlockDetails, lView: LView, t
  * @param tDetails Static information about this defer block.
  * @param lView LView of a host view.
  */
-export function triggerResourceLoading(tDetails: TDeferBlockDetails, lView: LView, tNode: TNode) {
+export function triggerResourceLoading(
+    tDetails: TDeferBlockDetails, lView: LView, tNode: TNode): Promise<unknown> {
   const injector = lView[INJECTOR]!;
   const tView = lView[TVIEW];
 
@@ -673,7 +704,7 @@ export function triggerResourceLoading(tDetails: TDeferBlockDetails, lView: LVie
     // If the loading status is different from initial one, it means that
     // the loading of dependencies is in progress and there is nothing to do
     // in this function. All details can be obtained from the `tDetails` object.
-    return;
+    return tDetails.loadingPromise ?? Promise.resolve();
   }
 
   const lDetails = getLDeferBlockDetails(lView, tNode);
@@ -710,7 +741,7 @@ export function triggerResourceLoading(tDetails: TDeferBlockDetails, lView: LVie
       tDetails.loadingState = DeferDependenciesLoadingState.COMPLETE;
       pendingTasks.remove(taskId);
     });
-    return;
+    return tDetails.loadingPromise;
   }
 
   // Start downloading of defer block dependencies.
@@ -776,6 +807,7 @@ export function triggerResourceLoading(tDetails: TDeferBlockDetails, lView: LVie
       }
     }
   });
+  return tDetails.loadingPromise;
 }
 
 /** Utility function to render placeholder content (if present) */
