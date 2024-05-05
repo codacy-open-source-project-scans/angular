@@ -8,8 +8,6 @@
 
 import {InjectionToken} from '../../di/injection_token';
 
-
-
 export const enum NotificationSource {
   // Change detection needs to run in order to synchronize application state
   // with the DOM when the following notifications are received:
@@ -23,9 +21,6 @@ export const enum NotificationSource {
   DebugApplyChanges,
   // ChangeDetectorRef.markForCheck indicates the component is dirty/needs to refresh.
   MarkForCheck,
-  // Node removal is queued in animation code and needs change detection to flush.
-  // TODO(atscott): We should not have to refresh views in order to flush animations.
-  AnimationQueuedNodeRemoval,
 
   // Bound listener callbacks execute and can update state without causing other notifications from
   // above.
@@ -60,8 +55,10 @@ export abstract class ChangeDetectionScheduler {
 
 /** Token used to indicate if zoneless was enabled via provideZonelessChangeDetection(). */
 export const ZONELESS_ENABLED = new InjectionToken<boolean>(
-    typeof ngDevMode === 'undefined' || ngDevMode ? 'Zoneless enabled' : '',
-    {providedIn: 'root', factory: () => false});
+  typeof ngDevMode === 'undefined' || ngDevMode ? 'Zoneless enabled' : '',
+  {providedIn: 'root', factory: () => false},
+);
 
 export const ZONELESS_SCHEDULER_DISABLED = new InjectionToken<boolean>(
-    typeof ngDevMode === 'undefined' || ngDevMode ? 'scheduler disabled' : '');
+  typeof ngDevMode === 'undefined' || ngDevMode ? 'scheduler disabled' : '',
+);

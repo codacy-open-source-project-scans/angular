@@ -75,7 +75,7 @@ yarn_install(
         "//:.yarnrc",
         "//:tools/npm-patches/@bazel+jasmine+5.8.1.patch",
         "//tools:postinstall-patches.js",
-        "//tools/esm-interop:patches/npm/@angular+build-tooling+0.0.0-e0ec7b60641d7f6369be45d8d02663fd50f320be.patch",
+        "//tools/esm-interop:patches/npm/@angular+build-tooling+0.0.0-56d0b1f597b9e4b5d99f289f6904a220802164c1.patch",
         "//tools/esm-interop:patches/npm/@bazel+concatjs+5.8.1.patch",
         "//tools/esm-interop:patches/npm/@bazel+esbuild+5.7.1.patch",
         "//tools/esm-interop:patches/npm/@bazel+protractor+5.7.1.patch",
@@ -167,10 +167,10 @@ cldr_xml_data_repository(
 # sass rules
 http_archive(
     name = "io_bazel_rules_sass",
-    sha256 = "ca27b3dcd294b134ccc9d0a1c6b63b810e115204e87a2b3d4cc247f5676d0a85",
-    strip_prefix = "rules_sass-c3f163fd9f570846c2aae4bf16ac69b4217e6f3b",
+    sha256 = "845061fad5cb42a353ac394fe6450ec9f21d337acf5b98011ef29ddcb33e3671",
+    strip_prefix = "rules_sass-9f8be59f5175d0dd3438d7da994b2782299e0c2c",
     urls = [
-        "https://github.com/bazelbuild/rules_sass/archive/c3f163fd9f570846c2aae4bf16ac69b4217e6f3b.zip",
+        "https://github.com/bazelbuild/rules_sass/archive/9f8be59f5175d0dd3438d7da994b2782299e0c2c.zip",
     ],
 )
 
