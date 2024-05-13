@@ -1329,9 +1329,6 @@
     "name": "init_discovery_utils"
   },
   {
-    "name": "init_dispatcher"
-  },
-  {
     "name": "init_document"
   },
   {
@@ -1342,6 +1339,9 @@
   },
   {
     "name": "init_dom_triggers"
+  },
+  {
+    "name": "init_earlyeventcontract"
   },
   {
     "name": "init_effect"
@@ -1426,6 +1426,9 @@
   },
   {
     "name": "init_eventcontract"
+  },
+  {
+    "name": "init_exhaustive_check_no_changes"
   },
   {
     "name": "init_fields"
@@ -2112,6 +2115,9 @@
     "name": "internalImportProvidersFrom"
   },
   {
+    "name": "internalProvideZoneChangeDetection"
+  },
+  {
     "name": "invokeAllTriggerCleanupFns"
   },
   {
@@ -2305,9 +2311,6 @@
   },
   {
     "name": "profiler"
-  },
-  {
-    "name": "provideZoneChangeDetection"
   },
   {
     "name": "refreshContentQueries"

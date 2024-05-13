@@ -7,7 +7,7 @@ The main advantages to removing ZoneJS as a dependency are:
 - **Improved performance**: ZoneJS uses DOM events and async tasks as indicators of when application state _might_ have updated and subsequently triggers application synchronization to run change detection on the application's views. ZoneJS does not have any insight into whether application state actually changed and so this synchronization is triggered more frequently than necessary.
 - **Improved Core Web Vitals**: ZoneJS brings a fair amount of overhead, both in payload size and in startup time cost.
 - **Improved debugging experience**: ZoneJS makes debugging code more difficult. Stack traces are harder to understand with ZoneJS. It's also difficult to understand when code breaks as a result of being outside the Angular Zone.
-- **Better ecosystem compatibility**: (new browser APIs, native async await, patching can conflict with libraries and other frameworks, maintainability, etc)
+- **Better ecosystem compatibility**: ZoneJS works by patching browser APIs but does not automatically have patches for every new browser API. Some APIs simply cannot be patched effectively, such as `async`/`await`, and have to be downleveled to work with ZoneJS. Sometimes libraries in the ecosystem are also incompatible with the way ZoneJS patches the native APIs. Removing ZoneJS as a dependency ensures better long-term compatibility by removing a source of complexity, monkey patching, and ongoing maintenance.
 
 ## Enabling Zoneless in an application
 
@@ -27,28 +27,6 @@ platformBrowser().bootstrapModule(AppModule, {ngZone: 'noop'});
 })
 export class AppModule {}
 ```
-
-## Testing
-
-The zoneless provider function can also be used with `TestBed` to help
-ensure the components under test are compatible with a Zoneless
-Angular application.
-
-```typescript
-TestBed.configureTestingModule({
-  providers: [provideExperimentalZonelessChangeDetection()]
-});
-
-const fixture = TestBed.createComponent(MyComponent);
-await fixture.whenStable();
-```
-
-To ensure tests have the most similar behavior to production code,
-avoid using `fixture.detectChanges()` when possibe. This forces
-change detection to run when Angular might otherwise have not
-scheduled change detection. Tests should ensure these notifications
-are happening and allow Angular to handle when to synchronize
-state rather than manually forcing it to happen in the test.
 
 ## Requirements for Zoneless compatibility
 
@@ -83,9 +61,11 @@ familiar and have similar timing to what was needed. More straightforward or dir
 such as `MutationObserver` when code needs to wait for certain DOM state (rather than waiting for it indirectly
 through Angular's render hooks).
 
+<docs-callout title="NgZone.run and NgZone.runOutsideAngular are compatible with Zoneless">
 `NgZone.run` and `NgZone.runOutsideAngular` do not need to be removed in order for code to be compatible with
 Zoneless applications. In fact, removing these calls can lead to performance regressions for libraries that
 are used in applications that still rely on ZoneJS.
+</docs-callout>
 
 ### `ExperimentalPendingTasks` for Server Side Rendering (SSR)
 
@@ -104,3 +84,35 @@ taskCleanup();
 The framework uses this service internally as well to prevent serialization until asynchronous tasks are complete. These include, but are not limited to,
 an ongoing Router navigation and an incomplete `HttpClient` request.
 
+## Testing and Debugging
+
+### Using Zoneless in `TestBed`
+
+The zoneless provider function can also be used with `TestBed` to help
+ensure the components under test are compatible with a Zoneless
+Angular application.
+
+```typescript
+TestBed.configureTestingModule({
+  providers: [provideExperimentalZonelessChangeDetection()]
+});
+
+const fixture = TestBed.createComponent(MyComponent);
+await fixture.whenStable();
+```
+
+To ensure tests have the most similar behavior to production code,
+avoid using `fixture.detectChanges()` when possibe. This forces
+change detection to run when Angular might otherwise have not
+scheduled change detection. Tests should ensure these notifications
+are happening and allow Angular to handle when to synchronize
+state rather than manually forcing it to happen in the test.
+
+### Debug-mode check to ensure updates are detected
+
+Angular also provides an additional tool to help verify that an application is making
+updates to state in a zoneless-compatible way. `provideExperimentalCheckNoChangesForDebug`
+can be used to periodically check to ensure that no bindings have been updated
+without a notification. Angular will throw `ExpressionChangedAfterItHasBeenCheckedError`
+if there is an updated binding that would not have refreshed by the zoneless change
+detection.

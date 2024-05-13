@@ -8,24 +8,28 @@
 
 import {createEventInfoFromParameters, EventInfo} from './event_info';
 
-declare global {
-  interface Window {
-    _ejsa?: EarlyJsactionData;
-  }
+export declare interface EarlyJsactionDataContainer {
+  _ejsa?: EarlyJsactionData;
 }
 
 /**
  * Defines the early jsaction data types.
  */
 export declare interface EarlyJsactionData {
-  // List used to keep track of the early JSAction event types.
+  /** List used to keep track of the early JSAction event types. */
   et: string[];
 
-  // List used to keep track of the JSAction events if using earlyeventcontract.
+  /** List used to keep track of capture event types. */
+  etc: string[];
+
+  /** List used to keep track of the JSAction events if using earlyeventcontract. */
   q: EventInfo[];
 
-  // Early Jsaction handler
+  /** Early Jsaction handler. */
   h: (event: Event) => void;
+
+  /** Container for listening to events. */
+  c: HTMLElement;
 }
 
 /**
@@ -34,31 +38,38 @@ export declare interface EarlyJsactionData {
  * late-loaded EventContract.
  */
 export class EarlyEventContract {
-  constructor() {
-    window._ejsa = {
+  constructor(
+    private readonly replaySink: EarlyJsactionDataContainer = window as EarlyJsactionDataContainer,
+    private readonly container = window.document.documentElement,
+  ) {
+    replaySink._ejsa = {
+      c: container,
       q: [],
       et: [],
+      etc: [],
       h: (event: Event) => {
         const eventInfo = createEventInfoFromParameters(
           event.type,
           event,
           event.target as Element,
-          window.document.documentElement,
+          container,
           Date.now(),
         );
-        window._ejsa!.q.push(eventInfo);
+        replaySink._ejsa!.q.push(eventInfo);
       },
     };
   }
 
   /**
-   * Installs a list of event types for window.document.documentElement.
+   * Installs a list of event types for container .
    */
-  addEvents(types: string[]) {
+  addEvents(types: string[], capture?: boolean) {
+    const replaySink = this.replaySink._ejsa!;
     for (let idx = 0; idx < types.length; idx++) {
       const eventType = types[idx];
-      window._ejsa!.et.push(eventType);
-      window.document.documentElement.addEventListener(eventType, window._ejsa!.h);
+      const eventTypes = capture ? replaySink.etc : replaySink.et;
+      eventTypes.push(eventType);
+      this.container.addEventListener(eventType, replaySink.h, capture);
     }
   }
 }

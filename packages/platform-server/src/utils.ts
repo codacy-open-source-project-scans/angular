@@ -72,6 +72,38 @@ function removeEventDispatchScript(doc: Document) {
 }
 
 /**
+ * Annotate nodes for hydration and remove event dispatch script when not needed.
+ */
+function prepareForHydration(platformState: PlatformState, applicationRef: ApplicationRef): void {
+  const environmentInjector = applicationRef.injector;
+  const doc = platformState.getDocument();
+
+  if (!environmentInjector.get(IS_HYDRATION_DOM_REUSE_ENABLED, false)) {
+    // Hydration is diabled, remove inlined event dispatch script.
+    // (which was injected by the build process) from the HTML.
+    removeEventDispatchScript(doc);
+
+    return;
+  }
+
+  appendSsrContentIntegrityMarker(doc);
+
+  const eventTypesToBeReplayed = annotateForHydration(applicationRef, doc);
+  if (eventTypesToBeReplayed) {
+    insertEventRecordScript(
+      environmentInjector.get(APP_ID),
+      doc,
+      eventTypesToBeReplayed,
+      environmentInjector.get(CSP_NONCE, null),
+    );
+  } else {
+    // No events to replay, we should remove inlined event dispatch script
+    // (which was injected by the build process) from the HTML.
+    removeEventDispatchScript(doc);
+  }
+}
+
+/**
  * Creates a marker comment node and append it into the `<body>`.
  * Some CDNs have mechanisms to remove all comment node from HTML.
  * This behaviour breaks hydration, so we'll detect on the client side if this
@@ -110,10 +142,33 @@ function insertEventRecordScript(
   const eventDispatchScript = findEventDispatchScript(doc);
   if (eventDispatchScript) {
     const events = Array.from(eventTypesToBeReplayed);
+    const captureEventTypes = [];
+    const eventTypes = [];
+    for (const eventType of events) {
+      if (
+        eventType === 'mouseenter' ||
+        eventType === 'mouseleave' ||
+        eventType === 'pointerenter' ||
+        eventType === 'pointerleave'
+      ) {
+        continue;
+      }
+      if (
+        eventType === 'focus' ||
+        eventType === 'blur' ||
+        eventType === 'error' ||
+        eventType === 'load' ||
+        eventType === 'toggle'
+      ) {
+        captureEventTypes.push(eventType);
+      } else {
+        eventTypes.push(eventType);
+      }
+    }
     // This is defined in packages/core/primitives/event-dispatch/contract_binary.ts
     const replayScriptContents = `window.__jsaction_bootstrap('ngContracts', document.body, ${JSON.stringify(
       appId,
-    )}, ${JSON.stringify(events)});`;
+    )}, ${JSON.stringify(eventTypes)}${captureEventTypes.length ? ',' + JSON.stringify(captureEventTypes) : ''});`;
 
     const replayScript = createScript(doc, replayScriptContents, nonce);
 
@@ -124,31 +179,14 @@ function insertEventRecordScript(
 }
 
 async function _render(platformRef: PlatformRef, applicationRef: ApplicationRef): Promise<string> {
-  const environmentInjector = applicationRef.injector;
-
   // Block until application is stable.
   await whenStable(applicationRef);
 
   const platformState = platformRef.injector.get(PlatformState);
-  if (environmentInjector.get(IS_HYDRATION_DOM_REUSE_ENABLED, false)) {
-    const doc = platformState.getDocument();
-    appendSsrContentIntegrityMarker(doc);
-    const eventTypesToBeReplayed = annotateForHydration(applicationRef, doc);
-    if (eventTypesToBeReplayed) {
-      insertEventRecordScript(
-        environmentInjector.get(APP_ID),
-        doc,
-        eventTypesToBeReplayed,
-        environmentInjector.get(CSP_NONCE, null),
-      );
-    } else {
-      // No events to replay, we should remove inlined event dispatch script
-      // (which was injected by the build process) from the HTML.
-      removeEventDispatchScript(doc);
-    }
-  }
+  prepareForHydration(platformState, applicationRef);
 
   // Run any BEFORE_APP_SERIALIZED callbacks just before rendering to string.
+  const environmentInjector = applicationRef.injector;
   const callbacks = environmentInjector.get(BEFORE_APP_SERIALIZED, null);
   if (callbacks) {
     const asyncCallbacks: Promise<void>[] = [];

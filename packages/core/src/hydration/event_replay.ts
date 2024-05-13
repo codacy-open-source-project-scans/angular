@@ -7,8 +7,10 @@
  */
 
 import {
-  Dispatcher,
+  BaseDispatcher,
+  EarlyJsactionDataContainer,
   EventContract,
+  EventContractContainer,
   EventInfoWrapper,
   registerDispatcher,
 } from '@angular/core/primitives/event-dispatch';
@@ -32,10 +34,16 @@ export const EVENT_REPLAY_ENABLED_DEFAULT = false;
 export const CONTRACT_PROPERTY = 'ngContracts';
 
 declare global {
-  var ngContracts: {[key: string]: EventContract};
+  var ngContracts: {[key: string]: EarlyJsactionDataContainer};
+}
+
+// TODO: Upstream this back into event-dispatch.
+function getJsactionData(container: EarlyJsactionDataContainer) {
+  return container._ejsa;
 }
 
 const JSACTION_ATTRIBUTE = 'jsaction';
+const removeJsactionQueue: RElement[] = [];
 
 /**
  * Returns a set of providers required to setup support for event replay.
@@ -52,7 +60,9 @@ export function withEventReplay(): Provider[] {
       useValue: () => {
         setDisableEventReplayImpl((el: RElement) => {
           if (el.hasAttribute(JSACTION_ATTRIBUTE)) {
-            el.removeAttribute(JSACTION_ATTRIBUTE);
+            // We don't immediately remove the attribute here because
+            // we need it for replay that happens after hydration.
+            removeJsactionQueue.push(el);
           }
         });
       },
@@ -73,12 +83,32 @@ export function withEventReplay(): Provider[] {
               // This is set in packages/platform-server/src/utils.ts
               // Note: globalThis[CONTRACT_PROPERTY] may be undefined in case Event Replay feature
               // is enabled, but there are no events configured in an application.
-              const eventContract = globalThis[CONTRACT_PROPERTY]?.[appId] as EventContract;
-              if (eventContract) {
-                const dispatcher = new Dispatcher();
-                setEventReplayer(dispatcher);
-                // Event replay is kicked off as a side-effect of executing this function.
+              const container = globalThis[CONTRACT_PROPERTY]?.[appId];
+              const earlyJsactionData = getJsactionData(container);
+              if (earlyJsactionData) {
+                const eventContract = new EventContract(
+                  new EventContractContainer(earlyJsactionData.c),
+                );
+                for (const et of earlyJsactionData.et) {
+                  eventContract.addEvent(et);
+                }
+                for (const et of earlyJsactionData.etc) {
+                  eventContract.addEvent(et);
+                }
+                eventContract.replayEarlyEvents(container);
+                const dispatcher = new BaseDispatcher(() => {}, {
+                  eventReplayer: (queue) => {
+                    for (const event of queue) {
+                      handleEvent(event);
+                    }
+                    queue.length = 0;
+                  },
+                });
                 registerDispatcher(eventContract, dispatcher);
+                for (const el of removeJsactionQueue) {
+                  el.removeAttribute(JSACTION_ATTRIBUTE);
+                }
+                removeJsactionQueue.length = 0;
               }
             });
           };
@@ -145,17 +175,6 @@ export function setJSActionAttribute(
       nativeElement.setAttribute(JSACTION_ATTRIBUTE, parts.join(';'));
     }
   }
-}
-
-/**
- * Registers a function that should be invoked to replay events.
- */
-function setEventReplayer(dispatcher: Dispatcher) {
-  dispatcher.setEventReplayer((queue) => {
-    for (const event of queue) {
-      handleEvent(event);
-    }
-  });
 }
 
 /**

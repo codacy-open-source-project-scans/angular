@@ -21,6 +21,7 @@ export {
   defaultIterableDiffers as ɵdefaultIterableDiffers,
   defaultKeyValueDiffers as ɵdefaultKeyValueDiffers,
 } from './change_detection/change_detection';
+export {internalProvideZoneChangeDetection as ɵinternalProvideZoneChangeDetection} from './change_detection/scheduling/ng_zone_scheduling';
 export {
   ChangeDetectionScheduler as ɵChangeDetectionScheduler,
   NotificationSource as ɵNotificationSource,
