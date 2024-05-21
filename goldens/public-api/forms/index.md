@@ -800,7 +800,7 @@ export class PatternValidator extends AbstractValidatorDirective {
 }
 
 // @public
-export class PristineEvent extends ControlEvent {
+export class PristineChangeEvent extends ControlEvent {
     constructor(pristine: boolean, source: AbstractControl);
     // (undocumented)
     readonly pristine: boolean;
@@ -894,7 +894,7 @@ export class SelectMultipleControlValueAccessor extends BuiltInControlValueAcces
 export type SetDisabledStateOption = 'whenDisabledForLegacyCode' | 'always';
 
 // @public
-export class StatusEvent extends ControlEvent {
+export class StatusChangeEvent extends ControlEvent {
     constructor(status: FormControlStatus, source: AbstractControl);
     // (undocumented)
     readonly source: AbstractControl;
@@ -903,7 +903,7 @@ export class StatusEvent extends ControlEvent {
 }
 
 // @public
-export class TouchedEvent extends ControlEvent {
+export class TouchedChangeEvent extends ControlEvent {
     constructor(touched: boolean, source: AbstractControl);
     // (undocumented)
     readonly source: AbstractControl;

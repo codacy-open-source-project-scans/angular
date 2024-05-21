@@ -45,6 +45,14 @@ import {expect} from '@angular/platform-browser/testing/src/matchers';
 import {BehaviorSubject} from 'rxjs';
 
 describe('change detection', () => {
+  it('can provide zone and zoneless (last one wins like any other provider) in TestBed', () => {
+    expect(() => {
+      TestBed.configureTestingModule({
+        providers: [provideExperimentalZonelessChangeDetection(), provideZoneChangeDetection()],
+      });
+      TestBed.inject(ApplicationRef);
+    }).not.toThrow();
+  });
   describe('embedded views', () => {
     @Directive({selector: '[viewManipulation]', exportAs: 'vm'})
     class ViewManipulation {
@@ -1301,7 +1309,7 @@ describe('change detection', () => {
         expect(comp.viewCheckCount).toEqual(1);
       });
 
-      describe('provideCheckNoChangesForDebug', () => {
+      describe('provideExperimentalCheckNoChangesForDebug', () => {
         // Needed because tests in this repo patch rAF to be setTimeout
         // and coalescing tries to get the native one but fails so
         // coalescing will run a timeout in the zone and cause an infinite loop.

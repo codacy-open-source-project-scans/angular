@@ -7,8 +7,7 @@
  */
 
 import * as cache from '../src/cache';
-import {bootstrapCustomEventSupport, fireCustomEvent} from '../src/custom_events';
-import {stopPropagation} from '../src/dispatcher';
+import {stopPropagation} from '../src/legacy_dispatcher';
 import {
   EarlyEventContract,
   EarlyJsactionData,
@@ -22,10 +21,14 @@ import {EventContractMultiContainer} from '../src/event_contract_multi_container
 import {EventInfo, EventInfoWrapper} from '../src/event_info';
 import {EventType} from '../src/event_type';
 import {addDeferredA11yClickSupport, Dispatcher, EventContract} from '../src/eventcontract';
-import {Property} from '../src/property';
+import {OWNER} from '../src/property';
 import {Restriction} from '../src/restriction';
 
 import {safeElement, testonlyHtml} from './html';
+import {
+  Dispatcher as LateDispatcher,
+  registerDispatcher as registerLateDispatcher,
+} from '../src/dispatcher';
 
 declare global {
   interface Window extends EarlyJsactionDataContainer {}
@@ -96,12 +99,6 @@ const domContent = `
 
 <div id="shadow-dom-container">
   <div id="shadow-dom-action-element" jsaction="handleClick">
-  </div>
-</div>
-
-<div id="custom-event-container">
-  <div id="custom-event-action-element" jsaction="custom-event:handleCustomEvent">
-    <div id="custom-event-target-element"></div>
   </div>
 </div>
 
@@ -183,13 +180,6 @@ const domContent = `
   </div>
 </div>
 
-<div id="jsnamespace-container">
-  <div id="jsnamespace-namespace-element" jsnamespace="namespace">
-    <div id="jsnamespace-action-element" jsaction="handleClick">
-      <div id="jsnamespace-target-element"></div>
-    </div>
-  </div>
-</div>
 <div id="focus-container">
   <div id="focus-action-element" jsaction="focus:handleFocus">
     <button id="focus-target-element">Focus Button</button>
@@ -338,7 +328,6 @@ describe('EventContract', () => {
     safeElement.setInnerHtml(document.body, testonlyHtml(domContent));
     EventContract.A11Y_CLICK_SUPPORT = false;
     EventContract.MOUSE_SPECIAL_SUPPORT = false;
-    EventContract.CUSTOM_EVENT_SUPPORT = false;
 
     // Normalize timestamp.
     spyOn(Date, 'now').and.returnValue(0);
@@ -515,7 +504,7 @@ describe('EventContract', () => {
     const container = getRequiredElementById('owner-click-container');
     const actionElement = getRequiredElementById('owner-click-action-element');
     const targetElement = getRequiredElementById('owner-click-target-element');
-    targetElement[Property.OWNER] = actionElement;
+    targetElement[OWNER] = actionElement;
 
     const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
     createEventContract({
@@ -852,118 +841,23 @@ describe('EventContract', () => {
     expect(eventContract.handler(EventType.CLICK)).toBeUndefined();
   });
 
-  describe('custom event', () => {
-    beforeEach(() => {
-      EventContract.CUSTOM_EVENT_SUPPORT = true;
-    });
-
-    it('dispatches event', () => {
-      const container = getRequiredElementById('custom-event-container');
-      const targetElement = getRequiredElementById('custom-event-target-element');
-      const actionElement = getRequiredElementById('custom-event-action-element');
-
-      const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-      createEventContract({
-        eventContractContainerManager: new EventContractContainer(container),
-        eventTypes: ['custom-event'],
-        dispatcher,
-      });
-
-      // createEvent/initEvent is used to support IE11
-      // tslint:disable:deprecation
-      const customEvent = document.createEvent('Event');
-      customEvent.initEvent('custom-event', true, true);
-      // tslint:enable:deprecation
-      targetElement.dispatchEvent(customEvent);
-
-      expect(dispatcher).toHaveBeenCalledTimes(1);
-      const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
-      expect(eventInfoWrapper.getEventType()).toBe('custom-event');
-      expect(eventInfoWrapper.getEvent()).toBe(customEvent);
-      expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
-      expect(eventInfoWrapper.getAction()?.name).toBe('handleCustomEvent');
-      expect(eventInfoWrapper.getAction()?.element).toBe(actionElement);
-    });
-
-    it('dispatches event with data', () => {
-      const container = getRequiredElementById('custom-event-container');
-      const targetElement = getRequiredElementById('custom-event-target-element');
-      const actionElement = getRequiredElementById('custom-event-action-element');
-
-      const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-      createEventContract({
-        eventContractContainerManager: new EventContractContainer(container),
-        eventTypes: ['custom-event'],
-        dispatcher,
-      });
-
-      const data = {'test': 1};
-      fireCustomEvent(targetElement, 'custom-event', data);
-
-      expect(dispatcher).toHaveBeenCalledTimes(1);
-      const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
-      expect(eventInfoWrapper.getEventType()).toBe('custom-event');
-      const customEvent = eventInfoWrapper.getEvent() as CustomEvent;
-      expect(customEvent.type).toBe(EventType.CUSTOM);
-      expect(customEvent.detail.data).toBe(data);
-      expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
-      expect(eventInfoWrapper.getAction()?.name).toBe('handleCustomEvent');
-      expect(eventInfoWrapper.getAction()?.element).toBe(actionElement);
-    });
-  });
-
-  describe('bootstrap custom event', () => {
-    it('dispatches with fireCustomEvent', () => {
-      const container = getRequiredElementById('custom-event-container');
-      const targetElement = getRequiredElementById('custom-event-target-element');
-      const actionElement = getRequiredElementById('custom-event-action-element');
-
-      const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-      const eventContract = createEventContract({
-        eventContractContainerManager: new EventContractContainer(container),
-        eventTypes: [],
-        dispatcher,
-      });
-      bootstrapCustomEventSupport(container, (event) => {
-        let handler = eventContract.handler(event.type);
-        if (!handler) {
-          eventContract.addEvent(event.type);
-          handler = eventContract.handler(event.type);
-        }
-        handler!(event.type, event, container);
-      });
-
-      const data = {'test': 1};
-      fireCustomEvent(targetElement, 'custom-event', data);
-
-      expect(dispatcher).toHaveBeenCalledTimes(1);
-      const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
-      expect(eventInfoWrapper.getEventType()).toBe('custom-event');
-      const customEvent = eventInfoWrapper.getEvent() as CustomEvent;
-      expect(customEvent.type).toBe('custom-event');
-      expect(customEvent.detail.data).toBe(data);
-      expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
-      expect(eventInfoWrapper.getAction()?.name).toBe('handleCustomEvent');
-      expect(eventInfoWrapper.getAction()?.element).toBe(actionElement);
-    });
-  });
-
   it('prevents default for click on anchor child', () => {
     const container = getRequiredElementById('anchor-click-container');
     const actionElement = getRequiredElementById('anchor-click-action-element');
     const targetElement = getRequiredElementById('anchor-click-target-element');
 
-    const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-    createEventContract({
+    const eventContract = createEventContract({
       eventContractContainerManager: new EventContractContainer(container),
       eventTypes: ['click'],
-      dispatcher,
     });
+    const dispatch = jasmine.createSpy<(eventInfoWrapper: EventInfoWrapper) => void>('dispatch');
+    const dispatcher = new LateDispatcher(dispatch);
+    registerLateDispatcher(eventContract, dispatcher);
 
     const clickEvent = dispatchMouseEvent(targetElement);
 
-    expect(dispatcher).toHaveBeenCalledTimes(1);
-    const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const eventInfoWrapper = dispatch.calls.mostRecent().args[0];
     expect(eventInfoWrapper.getEventType()).toBe('click');
     expect(eventInfoWrapper.getEvent()).toBe(clickEvent);
     expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
@@ -978,17 +872,18 @@ describe('EventContract', () => {
     const actionElement = getRequiredElementById('anchor-clickmod-action-element');
     const targetElement = getRequiredElementById('anchor-clickmod-target-element');
 
-    const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-    createEventContract({
+    const eventContract = createEventContract({
       eventContractContainerManager: new EventContractContainer(container),
       eventTypes: ['click'],
-      dispatcher,
     });
+    const dispatch = jasmine.createSpy<(eventInfoWrapper: EventInfoWrapper) => void>('dispatch');
+    const dispatcher = new LateDispatcher(dispatch);
+    registerLateDispatcher(eventContract, dispatcher);
 
     const clickEvent = dispatchMouseEvent(targetElement, {shiftKey: true});
 
-    expect(dispatcher).toHaveBeenCalledTimes(1);
-    const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const eventInfoWrapper = dispatch.calls.mostRecent().args[0];
     expect(eventInfoWrapper.getEventType()).toBe('clickmod');
     expect(eventInfoWrapper.getEvent()).toBe(clickEvent);
     expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
@@ -1070,17 +965,18 @@ describe('EventContract', () => {
       const actionElement = getRequiredElementById('a11y-anchor-click-action-element');
       const targetElement = getRequiredElementById('a11y-anchor-click-target-element');
 
-      const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
-      createEventContract({
+      const eventContract = createEventContract({
         eventContractContainerManager: new EventContractContainer(container),
         eventTypes: ['click'],
-        dispatcher,
       });
+      const dispatch = jasmine.createSpy<(eventInfoWrapper: EventInfoWrapper) => void>('dispatch');
+      const dispatcher = new LateDispatcher(dispatch);
+      registerLateDispatcher(eventContract, dispatcher);
 
       const keydownEvent = dispatchKeyboardEvent(targetElement, {key: 'Enter'});
 
-      expect(dispatcher).toHaveBeenCalledTimes(1);
-      const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const eventInfoWrapper = dispatch.calls.mostRecent().args[0];
       expect(eventInfoWrapper.getEventType()).toBe('click');
       expect(eventInfoWrapper.getEvent()).toBe(keydownEvent);
       expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
@@ -1199,19 +1095,20 @@ describe('EventContract', () => {
       const actionElement = getRequiredElementById('a11y-anchor-click-action-element');
       const targetElement = getRequiredElementById('a11y-anchor-click-target-element');
 
-      const dispatcher = jasmine.createSpy<Dispatcher>('dispatcher');
       const eventContract = createEventContract({
         eventContractContainerManager: new EventContractContainer(container),
         exportAddA11yClickSupport: true,
         eventTypes: ['click'],
-        dispatcher,
       });
       addDeferredA11yClickSupport(eventContract);
+      const dispatch = jasmine.createSpy<(eventInfoWrapper: EventInfoWrapper) => void>('dispatch');
+      const dispatcher = new LateDispatcher(dispatch);
+      registerLateDispatcher(eventContract, dispatcher);
 
       const keydownEvent = dispatchKeyboardEvent(targetElement, {key: 'Enter'});
 
-      expect(dispatcher).toHaveBeenCalledTimes(1);
-      const eventInfoWrapper = getLastDispatchedEventInfoWrapper(dispatcher);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const eventInfoWrapper = dispatch.calls.mostRecent().args[0];
       expect(eventInfoWrapper.getEventType()).toBe('click');
       expect(eventInfoWrapper.getEvent()).toBe(keydownEvent);
       expect(eventInfoWrapper.getTargetElement()).toBe(targetElement);
