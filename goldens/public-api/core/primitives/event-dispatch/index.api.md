@@ -78,6 +78,8 @@ export class EventInfoWrapper {
     // (undocumented)
     getIsReplay(): boolean | undefined;
     // (undocumented)
+    getResolved(): boolean | undefined;
+    // (undocumented)
     getTargetElement(): Element;
     // (undocumented)
     getTimestamp(): number;
@@ -92,10 +94,18 @@ export class EventInfoWrapper {
     // (undocumented)
     setIsReplay(replay: boolean): void;
     // (undocumented)
+    setResolved(resolved: boolean): void;
+    // (undocumented)
     setTargetElement(targetElement: Element): void;
     // (undocumented)
     setTimestamp(timestamp: number): void;
 }
+
+// @public
+export const isCaptureEvent: (eventType: string) => boolean;
+
+// @public
+export const isSupportedEvent: (eventType: string) => boolean;
 
 // @public
 export function registerDispatcher(eventContract: UnrenamedEventContract, dispatcher: Dispatcher): void;

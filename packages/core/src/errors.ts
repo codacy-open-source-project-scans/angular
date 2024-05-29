@@ -16,7 +16,7 @@ import {ERROR_DETAILS_PAGE_BASE_URL} from './error_details_base_url';
  * angular.io. This extra annotation is needed to avoid introducing a separate set to store
  * error codes which have guides, which might leak into runtime code.
  *
- * Full list of available error guides can be found at https://angular.io/errors.
+ * Full list of available error guides can be found at https://angular.dev/errors.
  *
  * Error code ranges per package:
  *  - core (this package): 100-999
@@ -116,6 +116,7 @@ export const enum RuntimeErrorCode {
   VIEW_ALREADY_DESTROYED = 911,
   COMPONENT_ID_COLLISION = -912,
   IMAGE_PERFORMANCE_WARNING = -913,
+  UNEXPECTED_ZONEJS_PRESENT_IN_ZONELESS_MODE = 914,
 
   // Signal integration errors
   REQUIRED_INPUT_NO_VALUE = -950,
